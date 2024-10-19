@@ -7,10 +7,6 @@ im1 and processed image im2
 
 function dsm = calculateDSM(im1, im2, rect)
 
-    % Convert to double-precision arrays for mean and std operations
-    im1 = double(im1);
-    im2 = double(im2);
-
     % Isolate ROI from background
     im1Roi = imcrop(im1, rect);
     im2Roi = imcrop(im2, rect);

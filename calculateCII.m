@@ -6,10 +6,6 @@ processed image im2
 %}
 
 function cii = calculateCII(im1, im2, rect)
-    
-    % Convert to double-precision arrays for mean operations
-    im1 = double(im1);
-    im2 = double(im2);
 
     % Isolate ROI from background
     im1Roi = imcrop(im1, rect);
