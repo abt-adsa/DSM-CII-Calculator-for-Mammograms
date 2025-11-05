@@ -5,58 +5,57 @@ Calculate the Distsribution Similarity Measure (DSM) between original image
 im1 and processed image im2
 %}
 
-function dsm = calculateDSM(im1, im2, rect)
+function dsm = calculateDSM(im1, im2, rect, background_width)
+    % background_width: How many pixels wide the background ring should be.
 
-    % Isolate ROI from background
-    im1Roi = imcrop(im1, rect);
-    im2Roi = imcrop(im2, rect);
+    % Create a mask for the entire image
     [h, w] = size(im1);
+    full_mask = false(h, w);
 
-    % Define horizontal and vertical background segments
-    horiBackCols = [1:fix(rect(1)) (ceil(rect(1) + rect(3)):w)];
-    horiBackRows = 1:h;
-    im1HoriBack = im1(horiBackCols, horiBackRows);
-    im2HoriBack = im2(horiBackCols, horiBackRows);
+    % Define the ROI coordinates, ensuring they are integers
+    x1 = round(rect(1));
+    y1 = round(rect(2));
+    x2 = round(rect(1) + rect(3));
+    y2 = round(rect(2) + rect(4));
 
-    vertBackCols = ceil(rect(1)):fix(rect(1) + rect(3));
-    vertBackRows = [1:fix(rect(2)) (ceil(rect(2) + rect(4)):h)];
-    im1VertBack = im1(vertBackCols, vertBackRows);
-    im2VertBack = im2(vertBackCols, vertBackRows);
+    % Create the ROI mask
+    roi_mask = full_mask;
+    roi_mask(y1:y2, x1:x2) = true;
 
-    % Calculate distribution statistics for each segment of im1
-    im1RoiMean = mean(im1Roi(:));
-    im1RoiStd = std(im1Roi(:));
+    % Create the background mask (the annulus)
+    % Define the outer box for the background, clamping to image bounds
+    bx1 = max(1, x1 - background_width);
+    by1 = max(1, y1 - background_width);
+    bx2 = min(w, x2 + background_width);
+    by2 = min(h, y2 + background_width);
     
-    im1HoriBackMean = mean(im1HoriBack(:));
-    im1HoriBackStd = std(im1HoriBack(:));
-    im1VertBackMean = mean(im1VertBack(:));
-    im1VertBackStd = std(im1VertBack(:));
+    background_mask = full_mask;
+    background_mask(by1:by2, bx1:bx2) = true;
+    background_mask(roi_mask) = false; % Exclude the ROI itself from the background
 
-    % Calculate distribution statistics for each segment of im2
-    im2RoiMean = mean(im2Roi(:));
-    im2RoiStd = std(im2Roi(:));
+    % Isolate pixels from the original image (im1)
+    im1RoiPixels = im1(roi_mask);
+    im1BackPixels = im1(background_mask);
+    
+    % Isolate pixels from the processed image (im2)
+    im2RoiPixels = im2(roi_mask);
+    im2BackPixels = im2(background_mask);
 
-    im2HoriBackMean = mean(im2HoriBack(:));
-    im2HoriBackStd = std(im2HoriBack(:));
-    im2VertBackMean = mean(im2VertBack(:));
-    im2VertBackStd = std(im2VertBack(:));
+    % Calculate distribution statistics for im1
+    im1RoiMean = mean(im1RoiPixels(:));
+    im1RoiStd = std(im1RoiPixels(:));
+    im1BackMean = mean(im1BackPixels(:));
+    im1BackStd = std(im1BackPixels(:));
+
+    % Calculate distribution statistics for im2
+    im2RoiMean = mean(im2RoiPixels(:));
+    im2RoiStd = std(im2RoiPixels(:));
+    im2BackMean = mean(im2BackPixels(:));
+    im2BackStd = std(im2BackPixels(:));
 
     % Calculate DSM
-    d1HoriBack = (im1HoriBackMean*im1RoiStd + im1RoiMean*im1HoriBackStd) ...
-                /(im1RoiStd + im1HoriBackStd);
-    d1VertBack = (im1VertBackMean*im1RoiStd + im1RoiMean*im1VertBackStd) ...
-                /(im1RoiStd + im1VertBackStd);
+    d1 = (im1BackMean*im1RoiStd + im1RoiMean*im1BackStd) / (im1RoiStd + im1BackStd);
+    d2 = (im2BackMean*im2RoiStd + im2RoiMean*im2BackStd) / (im2RoiStd + im2BackStd);
 
-    d2HoriBack = (im2HoriBackMean*im2RoiStd + im2RoiMean*im2HoriBackStd) ...
-                /(im2RoiStd + im2HoriBackStd);
-    d2VertBack = (im2VertBackMean*im2RoiStd + im2RoiMean*im2VertBackStd) ...
-                /(im2RoiStd + im2VertBackStd);
-
-    d1 = (d1HoriBack + d1VertBack)/2;
-    d2 = (d2HoriBack + d2VertBack)/2;
-
-    dsm = (abs(d1 - (im2HoriBackMean + im2VertBackMean)/2) ...
-         + abs(d2 - im2RoiMean)) ...
-         -(abs(d1 - (im1HoriBackMean + im1VertBackMean)/2) ...
-         + abs(d2 - im1RoiMean));
-end
+    dsm = (abs(d1 - im2BackMean) + abs(d2 - im2RoiMean)) - ...
+          (abs(d1 - im1BackMean) + abs(d2 - im1RoiMean));
